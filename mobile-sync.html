@@ -62,9 +62,9 @@
 
   <div class="card">
     <h1>Sync to PC</h1>
-    <p>Select your exported Notes JSON file to send it securely to your PC extension.</p>
+    <p>Select any supported file (PDF, DOCX, SDOCX, Image, JSON) to send it securely to your PC extension.</p>
     
-    <input type="file" id="file-input" accept=".json,.txt" style="display: none;">
+    <input type="file" id="file-input" accept=".json,.txt,.pdf,.docx,.sdocx,image/*" style="display: none;">
     <button id="upload-btn" class="btn" disabled>Connecting...</button>
     
     <div id="status">Establishing secure connection...</div>
@@ -121,26 +121,38 @@
         const file = e.target.files[0];
         if (!file) return;
 
+        // Ensure connection is open
+        if (!conn || !conn.open) {
+          statusEl.textContent = 'Error: Connection is not open.';
+          statusEl.className = 'error';
+          return;
+        }
+
+        statusEl.textContent = 'Preparing file...';
+
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
-            // Verify it's valid JSON before sending
-            const data = JSON.parse(event.target.result);
-            if (conn && conn.open) {
-              statusEl.textContent = 'Sending...';
-              conn.send(data);
-              statusEl.textContent = 'Sent successfully! Check your PC.';
-              statusEl.className = 'success';
-            } else {
-              statusEl.textContent = 'Error: Connection is not open.';
-              statusEl.className = 'error';
-            }
+            const arrayBuffer = event.target.result;
+            
+            statusEl.textContent = 'Sending...';
+            // Send the raw file data + metadata over PeerJS
+            conn.send({
+              type: 'file',
+              name: file.name,
+              mimeType: file.type,
+              data: arrayBuffer
+            });
+            
+            statusEl.textContent = 'Sent successfully! Check your PC.';
+            statusEl.className = 'success';
           } catch (err) {
-            statusEl.textContent = 'Invalid JSON file.';
+            statusEl.textContent = 'Failed to send file: ' + err.message;
             statusEl.className = 'error';
           }
         };
-        reader.readAsText(file);
+        // We read as ArrayBuffer so it works for PDFs, DOCX, Images, etc.
+        reader.readAsArrayBuffer(file);
       });
     }
   </script>
