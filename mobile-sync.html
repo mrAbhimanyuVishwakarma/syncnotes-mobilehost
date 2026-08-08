@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncNotes - Mobile Sync</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f5f5f5;
+      color: #333;
+      text-align: center;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-top: 2rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: #222;
+      margin-bottom: 1rem;
+    }
+    p {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-block;
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      background-color: #d32f2f;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      width: 100%;
+    }
+    .btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 1.5rem;
+      font-weight: 500;
+    }
+    .success {
+      color: #2e7d32;
+    }
+    .error {
+      color: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Sync to PC</h1>
+    <p>Select your exported Notes JSON file to send it securely to your PC extension.</p>
+    
+    <input type="file" id="file-input" accept=".json,.txt" style="display: none;">
+    <button id="upload-btn" class="btn" disabled>Connecting...</button>
+    
+    <div id="status">Establishing secure connection...</div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostPeerId = urlParams.get('peerId');
+    const uploadBtn = document.getElementById('upload-btn');
+    const fileInput = document.getElementById('file-input');
+    const statusEl = document.getElementById('status');
+
+    if (!hostPeerId) {
+      statusEl.textContent = 'Error: No Peer ID found in URL. Did you scan the QR code?';
+      statusEl.className = 'error';
+    } else {
+      const peer = new Peer();
+      let conn = null;
+
+      peer.on('open', () => {
+        statusEl.textContent = 'Connecting to PC...';
+        conn = peer.connect(hostPeerId);
+
+        conn.on('open', () => {
+          statusEl.textContent = 'Connected! Ready to sync.';
+          statusEl.className = 'success';
+          uploadBtn.textContent = 'Select JSON File to Sync';
+          uploadBtn.disabled = false;
+        });
+
+        conn.on('close', () => {
+          statusEl.textContent = 'Connection closed by PC.';
+          statusEl.className = 'error';
+          uploadBtn.disabled = true;
+        });
+
+        conn.on('error', (err) => {
+          statusEl.textContent = 'Connection error: ' + err;
+          statusEl.className = 'error';
+        });
+      });
+
+      peer.on('error', (err) => {
+        statusEl.textContent = 'PeerJS Error: ' + err.type;
+        statusEl.className = 'error';
+      });
+
+      uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            // Verify it's valid JSON before sending
+            const data = JSON.parse(event.target.result);
+            if (conn && conn.open) {
+              statusEl.textContent = 'Sending...';
+              conn.send(data);
+              statusEl.textContent = 'Sent successfully! Check your PC.';
+              statusEl.className = 'success';
+            } else {
+              statusEl.textContent = 'Error: Connection is not open.';
+              statusEl.className = 'error';
+            }
+          } catch (err) {
+            statusEl.textContent = 'Invalid JSON file.';
+            statusEl.className = 'error';
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+  </script>
+</body>
+</html>
