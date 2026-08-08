@@ -136,13 +136,15 @@
             const arrayBuffer = event.target.result;
             
             statusEl.textContent = 'Sending...';
-            // Send the raw file data + metadata over PeerJS
+            // Send metadata first
             conn.send({
-              type: 'file',
+              type: 'file-meta',
               name: file.name,
-              mimeType: file.type,
-              data: arrayBuffer
+              mimeType: file.type
             });
+            
+            // Then send the raw ArrayBuffer. PeerJS natively chunks raw ArrayBuffers.
+            conn.send(arrayBuffer);
             
             statusEl.textContent = 'Sent successfully! Check your PC.';
             statusEl.className = 'success';
